@@ -129,7 +129,7 @@ void receive(const MyMessage &message)
     if (message.getSensor() > 9) {
       // ON/OFF
       byte index = message.getSensor() - 10;
-      digitalWrite(IO[index].sortie, message.getBool() ? !IO[index].on : IO[index].on);
+      digitalWrite(IO[index].sortie, message.getBool() ? IO[index].on : !IO[index].on);
       IO[index].etat = message.getBool();
     }
   }
