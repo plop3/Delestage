@@ -53,7 +53,7 @@ MyMessage Depassement_msg(20, V_STATUS); // Dépassement intensité d'alerte
 //
 
 // Elements
-#define nbElements 5
+#define nbElements 6
 
 struct S {
   byte sortie;
@@ -63,7 +63,7 @@ struct S {
 };
 
 // Priorités
-byte prio[nbElements] = {2, 1, 0, 3, 4};
+byte prio[nbElements] = {2, 1, 0, 3, 5, 4};
 
 // Sorties par ordre (Pin, Intensité, Etat marche (pas de délestage), Coupé/allumé (inter))
 /*
@@ -72,11 +72,12 @@ byte prio[nbElements] = {2, 1, 0, 3, 4};
   3 Radiateur Léo
   4 Radiateur salon
   5 Cumulus
+  6 Petit radiateur Léo
 */
-struct S IO[nbElements] = {{16, 9, 0, 1}, {17, 7, 0, 1}, {19, 7, 0, 1}, {18, 7, 0, 1}, {5, 7, 1, 1}};
+struct S IO[nbElements] = {{16, 9, 0, 1}, {17, 7, 0, 1}, {19, 7, 0, 1}, {18, 7, 0, 1}, {5, 7, 1, 1}, {15, 5, 0, 1}};
 
 // Intensité maxi
-byte IDEL = 32;   // Intensité maxi avant délestage
+byte IDEL = 31;   // Intensité maxi avant délestage
 byte IALERT = 40; // Intensité d'alerte, on déleste tout d'un coup
 byte NbDelest = 0;
 bool Alert = false;
@@ -263,7 +264,7 @@ void delestage() {
   }
   if (Depass != OldDepass) {
     send(Depassement_msg.set(Depass));
-    OldDepass = !Depass;
+    OldDepass = Depass;
   }
 }
 
