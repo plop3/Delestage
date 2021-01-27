@@ -29,7 +29,7 @@ TInfo tinfo;
 //#define MY_RF24_PA_LEVEL RF24_PA_MAX
 //#define MY_RF24_DATARATE RF24_1MBPS // fast
 #define MY_RF24_DATARATE RF24_250KBPS // slow
-//#define MY_REPEATER_FEATURE
+#define MY_REPEATER_FEATURE
 #define MY_NODE_ID 6
 #define MY_TRANSPORT_WAIT_READY_MS 5000
 
@@ -49,6 +49,7 @@ MyMessage ch2_msg(11, V_STATUS);        // Chambre Félix
 MyMessage ch3_msg(12, V_STATUS);        // Chambre Léo
 MyMessage ch4_msg(13, V_STATUS);        // Salon
 MyMessage ch7_msg(14, V_STATUS);        // Cumulus
+MyMessage ch5_msg(15, V_STATUS);        // Chambre Léo2
 MyMessage Depassement_msg(20, V_STATUS); // Dépassement intensité d'alerte
 //
 
@@ -74,11 +75,12 @@ byte prio[nbElements] = {2, 1, 0, 3, 5, 4};
   5 Cumulus
   6 Petit radiateur Léo
 */
-struct S IO[nbElements] = {{16, 9, 0, 1}, {17, 7, 0, 1}, {19, 7, 0, 1}, {18, 7, 0, 1}, {5, 7, 1, 1}, {15, 5, 0, 1}};
+struct S IO[nbElements] = {{16, 9, 0, 1}, {17, 7, 0, 1}, {19, 7, 0, 1}, {18, 7, 0, 1}, {5, 8, 1, 1}, {15, 5, 0, 1}};
 
 // Intensité maxi
-byte IDEL = 31;   // Intensité maxi avant délestage
-byte IALERT = 40; // Intensité d'alerte, on déleste tout d'un coup
+byte IDEL = 30;   // Intensité maxi avant délestage
+byte IALERT = 35; // Intensité d'alerte, on déleste tout d'un coup
+byte IURGENCE = 40; // Intensité maximum, on n'attend pas une deuxième mesure
 byte NbDelest = 0;
 bool Alert = false;
 bool OldAlert = !Alert;
@@ -104,9 +106,9 @@ void before() {
 }
 
 void presentation() {
-  sendSketchInfo("TELEINFO", "1.3.1");
+  sendSketchInfo("TELEINFO", "1.3.3");
   present(1, S_POWER, "EDF.PUISSANCE");
-  present(2, S_POWER, "EDF.I.inst");
+  present(2, S_MULTIMETER, "EDF.I.inst");
   present(4, S_BINARY, "HeurePleine");
   present(5, S_BINARY, "Delestage");
   present(6, S_DUST, "NbElements");
@@ -118,6 +120,7 @@ void presentation() {
   present(12, S_BINARY, "ChambreL");
   present(13, S_BINARY, "Salon");
   present(14, S_BINARY, "Cumulus");
+  present(15, S_BINARY, "ChambreL2");
   present(20, S_BINARY, "Depassement");
 }
 
@@ -197,7 +200,7 @@ int nbt = 0;
 void delestage() {
   // délestage toutes les 2 trames
   nbt++;
-  if (nbt < 2) return;
+  if (nbt < 2 && IINST < IURGENCE) return;
   nbt = 0;
   byte j;
   // Intensité < Max
