@@ -61,6 +61,7 @@ struct S {
   byte intensite;
   bool on;        // Etat relais ON (0 ou 1)
   bool etat;      // Element coupé ou activé par un interrupteur
+  bool delest;    // Element délesté
 };
 
 // Priorités
@@ -75,7 +76,7 @@ byte prio[nbElements] = {2, 1, 0, 3, 5, 4};
   5 Cumulus
   6 Petit radiateur Léo
 */
-struct S IO[nbElements] = {{16, 9, 0, 1}, {17, 7, 0, 1}, {19, 7, 0, 1}, {18, 7, 0, 1}, {5, 8, 1, 1}, {15, 5, 0, 1}};
+struct S IO[nbElements] = {{16, 9, 0, 1, 0}, {17, 7, 0, 1, 0}, {19, 7, 0, 1, 0}, {18, 7, 0, 1, 0}, {5, 8, 1, 1, 0}, {15, 5, 0, 1, 0}};
 
 // Intensité maxi
 byte IDEL = 30;   // Intensité maxi avant délestage
@@ -192,6 +193,7 @@ void sendInitialData() {
   send(ch2_msg.set(1));
   send(ch3_msg.set(1));
   send(ch4_msg.set(1));
+  send(ch5_msg.set(1));
   send(ch7_msg.set(1));
   send(nbdel_msg.set(0));
 }
@@ -213,12 +215,18 @@ void delestage() {
     // On teste par ordre de priorité si la sortie est coupée
     for (int i = 0; i < nbElements; i++) {
       j = prio[i];
-      if (digitalRead(IO[j].sortie) == !IO[j].on && (IO[j].intensite + IINST <= IDEL && IO[j].etat)) {
-        digitalWrite(IO[j].sortie, IO[j].on);
-        if (NbDelest > 0) NbDelest--;
-        send(nbdel_msg.set(NbDelest));
+      if (digitalRead(IO[j].sortie) == !IO[j].on && (IO[j].intensite + IINST <= IDEL)) { // && IO[j].etat)) {
+        if (IO[j].etat) {
+          digitalWrite(IO[j].sortie, IO[j].on);
+          if (NbDelest > 0) NbDelest--;
+          send(nbdel_msg.set(NbDelest));
+        }
+        else if (IO[j].delest) {
+          IO[j].delest=false;
+          NbDelest--;
+        }
         if (!NbDelest) {
-          LED(75, 0, 0); //Vert
+        LED(75, 0, 0); //Vert
           send(delestage_msg.set(0));
         }
         break;
@@ -231,6 +239,7 @@ void delestage() {
       j = prio[i];
       if (digitalRead(IO[j].sortie) == IO[j].on) {
         digitalWrite(IO[j].sortie, !IO[j].on);
+        IO[j].delest = true;
         NbDelest++;
         send(nbdel_msg.set(NbDelest));
         if (NbDelest == 1) {
@@ -251,6 +260,7 @@ void delestage() {
       //Serial.println(IO[i].sortie);
       if (digitalRead(IO[i].sortie) == IO[i].on) {
         digitalWrite(IO[i].sortie, !IO[i].on);
+        IO[j].delest = true;
         NbDelest++;
       }
     }
