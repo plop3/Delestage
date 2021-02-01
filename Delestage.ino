@@ -9,7 +9,7 @@
   Détection coupure/reprise secteur (envoi d'un SMS)
 */
 
-#define MY_DEBUG
+//#define MY_DEBUG
 
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
@@ -25,10 +25,10 @@ SoftwareSerial Serial1(3, 4);
 TInfo tinfo;
 
 #define MY_RADIO_RF24
-//#define MY_RF24_PA_LEVEL RF24_PA_HIGH
+#define MY_RF24_PA_LEVEL RF24_PA_HIGH
 //#define MY_RF24_PA_LEVEL RF24_PA_MAX
 //#define MY_RF24_DATARATE RF24_1MBPS // fast
-#define MY_RF24_DATARATE RF24_250KBPS // slow
+//#define MY_RF24_DATARATE RF24_250KBPS // slow
 #define MY_REPEATER_FEATURE
 #define MY_NODE_ID 6
 #define MY_TRANSPORT_WAIT_READY_MS 5000
@@ -41,8 +41,8 @@ MyMessage current_msg(2, V_CURRENT);    // Intensité
 MyMessage current_PTEC(4, V_STATUS);    // Jour / Nuit
 MyMessage delestage_msg(5, V_STATUS);   // Mode délestage
 MyMessage nbdel_msg(6, V_LEVEL);         // Nombre déléments délestés
-MyMessage HC_msg(7, V_KWH );              // en fait c'est des WH
-MyMessage HP_msg(8, V_KWH );              // en fait c'est des WH
+//MyMessage HC_msg(7, V_KWH );              // en fait c'est des WH
+//MyMessage HP_msg(8, V_KWH );              // en fait c'est des WH
 MyMessage Alerte_msg(9, V_STATUS);          // Alerte délestage maximum
 MyMessage ch1_msg(10, V_STATUS);        // Chambre parents
 MyMessage ch2_msg(11, V_STATUS);        // Chambre Félix
@@ -50,7 +50,7 @@ MyMessage ch3_msg(12, V_STATUS);        // Chambre Léo
 MyMessage ch4_msg(13, V_STATUS);        // Salon
 MyMessage ch7_msg(14, V_STATUS);        // Cumulus
 MyMessage ch5_msg(15, V_STATUS);        // Chambre Léo2
-MyMessage Depassement_msg(20, V_STATUS); // Dépassement intensité d'alerte
+//MyMessage Depassement_msg(20, V_STATUS); // Dépassement intensité d'alerte
 //
 
 // Elements
@@ -85,13 +85,13 @@ byte IURGENCE = 40; // Intensité maximum, on n'attend pas une deuxième mesure
 byte NbDelest = 0;
 bool Alert = false;
 bool OldAlert = !Alert;
-bool Depass = false;
-bool OldDepass = !Depass;
+//bool Depass = false;
+//bool OldDepass = !Depass;
 
 // Infos
 byte IINST = 120;
 int PAPP = 30000;
-unsigned long HC, HP = 0;
+//unsigned long HC, HP = 0;
 String PTEC = "HC..";
 
 void before() {
@@ -107,14 +107,14 @@ void before() {
 }
 
 void presentation() {
-  sendSketchInfo("TELEINFO", "1.3.3");
+  sendSketchInfo("TELEINFO", "1.4.0");
   present(1, S_POWER, "EDF.PUISSANCE");
   present(2, S_MULTIMETER, "EDF.I.inst");
   present(4, S_BINARY, "HeurePleine");
   present(5, S_BINARY, "Delestage");
   present(6, S_DUST, "NbElements");
-  present(7, S_POWER, "HeuresCreuses");
-  present(8, S_POWER, "HeuresPleines");
+  //present(7, S_POWER, "HeuresCreuses");
+  //present(8, S_POWER, "HeuresPleines");
   present(9, S_BINARY, "Alerte");
   present(10, S_BINARY, "ChambreP");
   present(11, S_BINARY, "ChambreF");
@@ -122,7 +122,7 @@ void presentation() {
   present(13, S_BINARY, "Salon");
   present(14, S_BINARY, "Cumulus");
   present(15, S_BINARY, "ChambreL2");
-  present(20, S_BINARY, "Depassement");
+  //present(20, S_BINARY, "Depassement");
 }
 
 void setup() {
@@ -170,16 +170,17 @@ void readData(ValueList * me, uint8_t  flags)
       PTEC = me->value;
       send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
     }
-    else if ((rep == "HCHC") && (valeur != HC)) {
-      HC = valeur;
-      Serial.println(float(valeur) / 1000);
-      send(HC_msg.set(float(valeur) / 1000, 3));
-    }
-    else if ((rep == "HCHP" ) && (valeur != HP)) {
-      HP = valeur;
-      send(HP_msg.set(float(valeur) / 1000, 3));
-      Serial.println(float(valeur) / 1000);
-    }
+    /*    else if ((rep == "HCHC") && (valeur != HC)) {
+          HC = valeur;
+          //Serial.println(float(valeur) / 1000);
+
+        }
+        else if ((rep == "HCHP" ) && (valeur != HP)) {
+          HP = valeur;
+          send(HP_msg.set(float(valeur) / 1000, 3));
+          //Serial.println(float(valeur) / 1000);
+        }
+    */
   }
   //  IMAX = currentTI.IMAX;
   //  HC = currentTI.HC_HC;
@@ -209,7 +210,7 @@ void delestage() {
   if (IINST <= IDEL) {
     if (Alert) {
       Alert = false;
-      Depass = false;
+//      Depass = false;
       LED(37, 70, 5); // Orange
     }
     // On teste par ordre de priorité si la sortie est coupée
@@ -222,11 +223,11 @@ void delestage() {
           send(nbdel_msg.set(NbDelest));
         }
         else if (IO[j].delest) {
-          IO[j].delest=false;
+          IO[j].delest = false;
           NbDelest--;
         }
         if (!NbDelest) {
-        LED(75, 0, 0); //Vert
+          LED(75, 0, 0); //Vert
           send(delestage_msg.set(0));
         }
         break;
@@ -251,7 +252,7 @@ void delestage() {
       if (i == 0) {
         LED(75, 0, 0); //Rouge
         Alert = true;
-        Depass = false;
+//        Depass = false;
       }
     }
   }
@@ -268,17 +269,18 @@ void delestage() {
     send(nbdel_msg.set(NbDelest));
     LED(75, 0, 0); //Rouge
     Alert = true;
-    Depass = true;
+//    Depass = true;
   }
   if (Alert != OldAlert) {
     send(Alerte_msg.set(Alert));
     OldAlert = Alert;
 
   }
-  if (Depass != OldDepass) {
-    send(Depassement_msg.set(Depass));
-    OldDepass = Depass;
-  }
+  /*  if (Depass != OldDepass) {
+      send(Depassement_msg.set(Depass));
+      OldDepass = Depass;
+    }
+  */
 }
 
 void LED(byte V, byte R, byte B) {
