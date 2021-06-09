@@ -190,6 +190,8 @@ void readData(ValueList * me, uint8_t  flags)
 
 void sendInitialData() {
   // Etat des boutons M/A (marche)
+  send(papp_msg.set(0));
+  send(current_msg.set(0));
   send(ch1_msg.set(1));
   send(ch2_msg.set(1));
   send(ch3_msg.set(1));
