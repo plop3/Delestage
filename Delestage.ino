@@ -41,8 +41,8 @@ MyMessage current_msg(2, V_CURRENT);    // Intensité
 MyMessage current_PTEC(4, V_STATUS);    // Jour / Nuit
 MyMessage delestage_msg(5, V_STATUS);   // Mode délestage
 MyMessage nbdel_msg(6, V_LEVEL);         // Nombre déléments délestés
-//MyMessage HC_msg(7, V_KWH );              // en fait c'est des WH
-//MyMessage HP_msg(8, V_KWH );              // en fait c'est des WH
+MyMessage HC_msg(7, V_KWH );              // en fait c'est des WH
+MyMessage HP_msg(8, V_KWH );              // en fait c'est des WH
 MyMessage Alerte_msg(9, V_STATUS);          // Alerte délestage maximum
 MyMessage ch1_msg(10, V_STATUS);        // Chambre parents
 MyMessage ch2_msg(11, V_STATUS);        // Chambre Félix
@@ -57,8 +57,8 @@ MyMessage ch5_msg(15, V_STATUS);        // Chambre Léo2
 #define nbElements 6
 
 struct S {
-  byte sortie;
-  byte intensite;
+  byte sortie;    // N° de la sortie (1: coupé, 0: marche)
+  byte intensite; // Consommation de l'élément (A)
   bool on;        // Etat relais ON (0 ou 1)
   bool etat;      // Element coupé ou activé par un interrupteur
   bool delest;    // Element délesté
@@ -85,25 +85,22 @@ byte IURGENCE = 40; // Intensité maximum, on n'attend pas une deuxième mesure
 byte NbDelest = 0;
 bool Alert = false;
 bool OldAlert = !Alert;
-//bool Depass = false;
-//bool OldDepass = !Depass;
 
 // Infos
 byte IINST = 120;
 int PAPP = 30000;
-//unsigned long HC, HP = 0;
+unsigned long HC, HP = 0;
 String PTEC = "HC..";
 
 void before() {
   // Coupure de toutes les sorties
-  for (int i = 0; i < nbElements; i++) {
-    //Serial.println(IO[i].sortie);
-    digitalWrite(IO[i].sortie, !IO[i].on);
-    pinMode(IO[i].sortie, OUTPUT);
-  }
   pixels.begin();
   pixels.clear();
-  LED(100, 100, 100);
+  for (int i = 0; i < nbElements; i++) {
+    //Serial.println(IO[i].sortie);
+    deleste(i);
+    pinMode(IO[i].sortie, OUTPUT);
+  }
 }
 
 void presentation() {
@@ -113,8 +110,8 @@ void presentation() {
   present(4, S_BINARY, "HeurePleine");
   present(5, S_BINARY, "Delestage");
   present(6, S_DUST, "NbElements");
-  //present(7, S_POWER, "HeuresCreuses");
-  //present(8, S_POWER, "HeuresPleines");
+  present(7, S_POWER, "HeuresCreuses");
+  present(8, S_POWER, "HeuresPleines");
   present(9, S_BINARY, "Alerte");
   present(10, S_BINARY, "ChambreP");
   present(11, S_BINARY, "ChambreF");
@@ -122,7 +119,6 @@ void presentation() {
   present(13, S_BINARY, "Salon");
   present(14, S_BINARY, "Cumulus");
   present(15, S_BINARY, "ChambreL2");
-  //present(20, S_BINARY, "Depassement");
 }
 
 void setup() {
@@ -142,12 +138,17 @@ void loop() {
 
 void receive(const MyMessage &message)
 {
-  if (message.getType() == V_STATUS) {
-    if (message.getSensor() > 9) {
-      // ON/OFF
-      byte index = message.getSensor() - 10;
-      digitalWrite(IO[index].sortie, message.getBool() ? IO[index].on : !IO[index].on);
-      IO[index].etat = message.getBool();
+  if ((message.getType() == V_STATUS) && (message.getSensor() > 9)) {
+    // ON/OFF
+    byte index = message.getSensor() - 10;
+    IO[index].etat = message.getBool();
+    // Allumage de l'élément
+    if (IO[index].etat) {
+      // Allume l'élément
+      active(index);
+    }
+    else {
+      coupe(index);
     }
   }
 }
@@ -170,21 +171,17 @@ void readData(ValueList * me, uint8_t  flags)
       PTEC = me->value;
       send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
     }
-    /*    else if ((rep == "HCHC") && (valeur != HC)) {
-          HC = valeur;
-          //Serial.println(float(valeur) / 1000);
-
-        }
-        else if ((rep == "HCHP" ) && (valeur != HP)) {
-          HP = valeur;
-          send(HP_msg.set(float(valeur) / 1000, 3));
-          //Serial.println(float(valeur) / 1000);
-        }
-    */
+    else if ((rep == "HCHC") && (valeur != HC)) {
+      HC = valeur;
+    }
+    else if ((rep == "HCHP" ) && (valeur != HP)) {
+      HP = valeur;
+      send(HP_msg.set(float(valeur) / 1000, 3));
+    }
   }
-  //  IMAX = currentTI.IMAX;
-  //  HC = currentTI.HC_HC;
-  //  HP = currentTI.HC_HP;
+  //IMAX = currentTI.IMAX;
+  //HC = currentTI.HC_HC;
+  //HP = currentTI.HC_HP;
 
 }
 
@@ -208,83 +205,83 @@ void delestage() {
   if (nbt < 2 && IINST < IURGENCE) return;
   nbt = 0;
   byte j;
-  // Intensité < Max
-  if (IINST <= IDEL) {
-    if (Alert) {
-      Alert = false;
-//      Depass = false;
-      LED(37, 70, 5); // Orange
-    }
-    // On teste par ordre de priorité si la sortie est coupée
-    for (int i = 0; i < nbElements; i++) {
-      j = prio[i];
-      if (digitalRead(IO[j].sortie) == !IO[j].on && (IO[j].intensite + IINST <= IDEL)) { // && IO[j].etat)) {
-        if (IO[j].etat) {
-          digitalWrite(IO[j].sortie, IO[j].on);
-          if (NbDelest > 0) NbDelest--;
-          send(nbdel_msg.set(NbDelest));
-        }
-        else if (IO[j].delest) {
-          IO[j].delest = false;
-          NbDelest--;
-        }
-        if (!NbDelest) {
-          LED(75, 0, 0); //Vert
-          send(delestage_msg.set(0));
-        }
-        break;
+  // Intensité < MAX
+  if (IINST < IDEL) {
+    // Il y a des éléments à délester 
+    if (NbDelest>0) {
+      // On teste par ordre de priorité si la sortie est coupée
+      for (int i = 0; i < nbElements; i++) {
+        j = prio[i];
+        // Réactivation des éléments
+        if (active(j)) break;
       }
     }
   }
-  // Intensité > Max
+    // Intensité > Max, délestage d'un élément
   else if (IINST < IALERT) {
     for (int i = nbElements - 1; i >= 0; i--) {
       j = prio[i];
-      if (digitalRead(IO[j].sortie) == IO[j].on) {
-        digitalWrite(IO[j].sortie, !IO[j].on);
-        IO[j].delest = true;
-        NbDelest++;
-        send(nbdel_msg.set(NbDelest));
-        if (NbDelest == 1) {
-          send(delestage_msg.set(1));
-          LED(37, 70, 5); // Orange
-        }
-        break;
-      }
-      if (i == 0) {
-        LED(75, 0, 0); //Rouge
-        Alert = true;
-//        Depass = false;
-      }
+      if (deleste(j)) break;
     }
   }
   else {
+    // Délestage de tous les éléments
     for (int i = 0; i < nbElements; i++) {
-      //Serial.println(IO[i].sortie);
-      if (digitalRead(IO[i].sortie) == IO[i].on) {
-        digitalWrite(IO[i].sortie, !IO[i].on);
-        IO[j].delest = true;
-        NbDelest++;
-      }
+      deleste(i);
     }
-    send(delestage_msg.set(1));
-    send(nbdel_msg.set(NbDelest));
-    LED(75, 0, 0); //Rouge
-    Alert = true;
-//    Depass = true;
   }
-  if (Alert != OldAlert) {
-    send(Alerte_msg.set(Alert));
-    OldAlert = Alert;
-
-  }
-  /*  if (Depass != OldDepass) {
-      send(Depassement_msg.set(Depass));
-      OldDepass = Depass;
-    }
-  */
 }
 
+bool deleste(int element) {
+  // Délestage d'un élément
+  // Element actif ?
+  if (digitalRead(IO[element].sortie) == IO[element].on) {
+    digitalWrite(IO[element].sortie, !IO[element].on);
+    IO[element].delest = true;
+    NbDelest++;
+    updateLED();
+    return(true);
+  }
+  return(false);
+}
+
+bool active(int element) {
+  // Element coupé (OFF) ou trop consommateur ?
+  if ((!IO[element].etat) || (IO[element].intensite + IINST > IDEL)) return(false);
+  // Active l'élémént
+  digitalWrite(IO[element].sortie, IO[element].on);
+  NbDelest--;
+  updateLED();
+  return(true);
+}
+
+void coupe(int element) {
+  // Element actif ?
+  if (digitalRead(IO[element].sortie) == IO[element].on) {
+    digitalWrite(IO[element].sortie, !IO[element].on);
+  }
+  else {
+    // Elément délesté
+    NbDelest--;
+    updateLED();
+  }
+}
+
+void updateLED() {
+  send(nbdel_msg.set(NbDelest));
+    if (NbDelest==0) {
+      LED(75, 0, 0); //Vert
+    }
+    else if (NbDelest==1) {
+      send(delestage_msg.set(1));
+      LED(37, 70, 5); // Orange
+    }
+    else if (NbDelest=nbElements) {
+      Alert = true;
+      send(Alerte_msg.set(Alert));
+      LED(75, 0, 0); //Rouge
+    }
+}
 void LED(byte V, byte R, byte B) {
   pixels.setPixelColor(0, pixels.Color(V, R, B));
   pixels.show();
