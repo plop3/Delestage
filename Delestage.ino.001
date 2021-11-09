@@ -1,0 +1,256 @@
+/*
+   Délestage
+   Version 0.1
+   23/09/2020
+*/
+
+/* TODO
+	Interrupteurs / chauffages
+	Thermomètres 1wire
+*/
+
+//#define DEBUG
+//#define MY_DEBUG
+
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+#include <avr/power.h> // Required for 16 MHz Adafruit Trinket
+#endif
+#define NUMPIXELS 1
+#define PINLED 8
+Adafruit_NeoPixel pixels(NUMPIXELS, PINLED, NEO_GRB + NEO_KHZ400);
+
+#include <SimpleTimer.h>
+SimpleTimer timer;
+
+#include <SoftwareSerial.h>
+#include <teleInfo.h>
+#define TI_RX 3
+teleInfo TI( TI_RX );
+#define BUFSIZE 15
+teleInfo_t currentTI;
+
+#define MY_RADIO_RF24
+#define MY_RF24_PA_LEVEL RF24_PA_HIGH
+#define MY_REPEATER_FEATURE
+#define MY_NODE_ID 6
+#define MY_TRANSPORT_WAIT_READY_MS 5000
+
+#include <MySensors.h>
+
+//MyMessage kwh_msg(1, V_KWH);
+MyMessage papp_msg(1, V_WATT);
+MyMessage current_msg(2, V_CURRENT);
+MyMessage current_max_msg(3, V_CURRENT);
+MyMessage current_PTEC(4, V_STATUS);
+MyMessage delestage_msg(5, V_STATUS);
+MyMessage index_HC_msg(6, V_KWH);
+MyMessage index_HP_msg(7, V_KWH);
+//MyMessage ch1_msg(10, V_STATUS);  // Parents
+//MyMessage ch2_msg(11, V_STATUS);  // Félix
+//MyMessage ch3_msg(12, V_STATUS);  // Léo
+//MyMessage ch4_msg(13, V_STATUS);  // Salon
+MyMessage ch7_msg(14, V_STATUS);  // Cumulus
+//
+
+// Elements
+#define nbElements 5
+
+struct S {
+  byte sortie;
+  byte intensite;
+  bool on;        // Etat relais ON (0 ou 1)
+  bool etat;      // Element coupé ou activé par un interrupteur
+};
+
+// Priorités
+byte prio[nbElements] = {2, 1, 0, 3, 4};
+
+// Sorties par ordre (Pin, Intensité, Etat marche (pas de délestage), Coupé/allumé (inter))
+/*
+  1 Radiateur parents
+  2 Radiateur Félix
+  3 Radiateur Léo
+  4 Radiateur salon
+  5 Cumulus
+*/
+struct S IO[nbElements] = {{16, 9, 0, 1}, {17, 7, 0, 1}, {19, 7, 0, 1}, {18, 7, 0, 1}, {5, 7, 1, 1}};
+
+// Intensité maxi
+byte IDEL = 32;
+byte Delest = nbElements;
+bool dog = false;
+
+// Infos
+byte IINST = 0;
+int PAPP = 0;
+
+struct {
+  byte act = 0;
+  byte old = 0;
+} IMAX;
+struct {
+  String act = "HC..";
+  String old = "HC..";
+} PTEC;
+struct {
+  unsigned long act = 0;
+  unsigned long old = 0;
+} HC;
+struct {
+  unsigned long act = 0;
+  unsigned long old = 0;
+} HP;
+
+void before() {
+  // Coupure de toutes les sorties
+  for (int i = 0; i < nbElements; i++) {
+    //Serial.println(IO[i].sortie);
+    digitalWrite(IO[i].sortie, !IO[i].on);
+    pinMode(IO[i].sortie, OUTPUT);
+    pixels.begin();
+    pixels.clear();
+    pixels.setPixelColor(0, pixels.Color(100, 100, 100)); pixels.show();
+  }
+}
+
+void presentation() {
+  sendSketchInfo("TELEINFO", "1.2.1");
+  //present(1, S_POWER, "EDF.Consommation");
+  present(1, S_POWER, "EDF.PUISSANCE");
+  present(2, S_MULTIMETER, "EDF.I.inst");
+  present(3, S_MULTIMETER, "EDF.I.maxi");
+  present(4, S_BINARY, "Heure pleine");
+  present(5, S_BINARY, "Delestage");
+  present(6, S_POWER, "Consommation HC");
+  present(7, S_POWER, "Consommation HP");
+  present(10, S_BINARY, "Ch1");   // Parents
+  present(11, S_BINARY, "Ch2");   // Félix
+  present(12, S_BINARY, "Ch3");   // Léo
+  present(13, S_BINARY, "Ch4");   // Salon
+  present(14, S_BINARY, "Ch7");   // Cumulus
+}
+
+void setup() {
+  timer.setInterval(30000, sendData);
+  timer.setTimeout(8000, sendInitialData);
+  pixels.setPixelColor(0, pixels.Color(75, 139, 9)); pixels.show(); // Orange
+}
+
+void loop() {
+  timer.run();
+  // Lecture de l'intensité actuelle
+#if defined DEBUG
+  if (Serial.available()) {
+    IINST = Serial.readString().toInt();
+    Serial.print("I: "); Serial.println(IINST);
+    delestage();
+  }
+#else
+  readData();
+  delestage();
+#endif
+}
+
+void receive(const MyMessage &message)
+{
+  if (message.getType() == V_STATUS) {
+    if (message.getSensor() > 9) {
+      // ON/OFF
+      byte index = message.getSensor() - 10;
+      digitalWrite(IO[index].sortie, message.getBool() ? !IO[index].on : IO[index].on);
+      IO[index].etat = message.getBool();
+    }
+  }
+}
+
+void readData()
+{
+  currentTI = TI.get();
+  // Display values
+  // Reception de l'intensité
+  IINST = currentTI.IINST;
+  PAPP = currentTI.PAPP;
+  IMAX.act = currentTI.IMAX;
+  PTEC.act = currentTI.PTEC;
+  HC.act = currentTI.HC_HC;
+  HP.act = currentTI.HC_HP;
+  Serial.print("IINST: "); Serial.println(IINST);
+  if (PTEC.act != PTEC.old) {
+    PTEC.old = PTEC.act;
+    send(current_PTEC.set(PTEC.act == "HC.." ? 0 : 1));
+  }
+}
+
+void sendInitialData() {
+  // Etat des boutons M/A (marche)
+  //  send(ch1_msg.set(1));
+  //  send(ch2_msg.set(1));
+  //  send(ch3_msg.set(1));
+  //  send(ch4_msg.set(1));
+  send(ch7_msg.set(1));
+}
+
+void sendData() {
+  send(papp_msg.set(PAPP));
+  send(current_msg.set(IINST));
+  send(current_max_msg.set(IMAX.act));
+  if (HC.act != HC.old) {
+    HC.old = HC.act;
+    send(index_HC_msg.set(HC.act));
+  }
+  if (HP.act != HP.old) {
+    HP.old = HP.act;
+    send(index_HP_msg.set(HP.act));
+  }
+}
+
+void delestage() {
+  // Intensité < Max
+  if (IINST <= IDEL) {
+    // On teste par ordre de priorité si la sortie est coupée
+    for (int i = 0; i < nbElements; i++) {
+      int j = prio[i];
+      if (digitalRead(IO[j].sortie) == !IO[j].on && (IO[j].intensite + IINST <= IDEL && IO[j].etat)) {
+        Delest--;
+        if (Delest == 0) {
+          send(delestage_msg.set(0));
+          pixels.setPixelColor(0, pixels.Color(150, 0, 0)); pixels.show(); // Vert
+        }
+        digitalWrite(IO[j].sortie, IO[j].on);
+        //#if defined DEBUG
+        Serial.print("Start "); Serial.println(IO[j].sortie);
+        Serial.print("Delestage: "); Serial.print(Delest);
+        //#endif
+        break;
+      }
+    }
+  }
+  // Intensité > Max
+  else {
+    for (int i = nbElements - 1; i >= 0; i--) {
+      int j = prio[i];
+      if (digitalRead(IO[j].sortie) == IO[j].on) {
+        digitalWrite(IO[j].sortie, !IO[j].on);
+        if (Delest == 0) {
+          send(delestage_msg.set(1));
+          pixels.setPixelColor(0, pixels.Color(150, 150, 0)); pixels.show(); // Jaune
+        }
+        else {
+          pixels.setPixelColor(0, pixels.Color(75, 139, 9)); pixels.show(); // Orange
+        }
+        Delest++;
+        //#if defined DEBUG
+        Serial.print("Stop: "); Serial.println(IO[j].sortie);
+        //#endif
+        break;
+      }
+      if (i == 0) {
+#if defined DEBUG
+        Serial.println("ALERT");
+#endif
+        pixels.setPixelColor(0, pixels.Color(0, 150 , 0)); pixels.show(); // Rouge
+      }
+    }
+  }
+}
