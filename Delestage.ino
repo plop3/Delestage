@@ -169,11 +169,11 @@ void readData(ValueList * me, uint8_t  flags)
       PTEC = me->value;
       send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
     }
-    else if ((rep == "HCHC") && (valeur != HC) && (valeur > 0)) {
+    else if ((rep == "HCHC") && (valeur > HC)) {
       HC = valeur;
 	  send(HC_msg.set(float(valeur) / 1000, 3));
     }
-    else if ((rep == "HCHP" ) && (valeur != HP) && (valeur > 0)) {
+    else if ((rep == "HCHP" ) && (valeur > HP)) {
       HP = valeur;
       send(HP_msg.set(float(valeur) / 1000, 3));
     }
