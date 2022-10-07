@@ -1,0 +1,7 @@
+TODO
+
+Migration MQTT
+--------------
+
+Remplacement du NRF24L01 par un ESP8266/ESP32
+Envoi des données par MQTT

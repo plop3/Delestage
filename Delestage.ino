@@ -6,6 +6,9 @@
 */
 
 //#define MY_DEBUG
+#include <SimpleTimer.h>
+SimpleTimer timer;
+#define TPSSTART 120000   // Délai avant envoi des mesures
 
 #include <Adafruit_NeoPixel.h>
 #ifdef __AVR__
@@ -80,6 +83,7 @@ byte IALERT = 35; // Intensité d'alerte, on déleste tout d'un coup
 byte IURGENCE = 40; // Intensité maximum, on n'attend pas une deuxième mesure
 bool Alert = false;
 bool OldAlert = !Alert;
+bool Mes = false;   // Autorisation d'envoi des mesures
 
 // Infos
 byte IINST = 120;
@@ -119,6 +123,7 @@ void presentation() {
 
 void setup() {
   Serial1.begin(1200);
+  timer.setTimeout(TPSSTART, startMesure);
   tinfo.init();
   tinfo.attachData(readData);
   tinfo.attachNewFrame(delestage);
@@ -128,6 +133,7 @@ void setup() {
 
 void loop() {
   // Lecture de l'intensité actuelle
+  timer.run();
   if ( Serial1.available() )
     tinfo.process(Serial1.read());
 }
@@ -171,11 +177,11 @@ void readData(ValueList * me, uint8_t  flags)
     }
     else if ((rep == "HCHC") && (valeur > HC)) {
       HC = valeur;
-	  send(HC_msg.set(float(valeur) / 1000, 3));
+	    if (Mes) send(HC_msg.set(float(valeur) / 1000, 3));
     }
     else if ((rep == "HCHP" ) && (valeur > HP)) {
       HP = valeur;
-      send(HP_msg.set(float(valeur) / 1000, 3));
+      if (Mes) send(HP_msg.set(float(valeur) / 1000, 3));
     }
   }
 }
@@ -255,4 +261,9 @@ void updateLed() {
 void LED(byte V, byte R, byte B) {
   pixels.setPixelColor(0, pixels.Color(V, R, B));
   pixels.show();
+}
+
+void startMesure() {
+  // Démarrage des mesures
+  Mes=true;
 }
