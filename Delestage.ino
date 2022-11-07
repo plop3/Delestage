@@ -5,6 +5,9 @@
    08/11/2021 Version 2.1.1
 */
 
+// Pins
+#define RESETPIN 2 // Commande de reset de l'Arduino
+
 //#define MY_DEBUG
 #include <SimpleTimer.h>
 SimpleTimer timer;
@@ -119,6 +122,7 @@ void presentation() {
   present(13, S_BINARY, "Salon");
   present(14, S_BINARY, "Cumulus");
   present(15, S_BINARY, "ChambreL2");
+  present(20, S_BINARY, "ResetDelestage");
 }
 
 void setup() {
@@ -133,7 +137,7 @@ void setup() {
 
 void loop() {
   // Lecture de l'intensité actuelle
-  timer.run();
+  if (!Mes) timer.run();
   if ( Serial1.available() )
     tinfo.process(Serial1.read());
 }
@@ -141,7 +145,13 @@ void loop() {
 void receive(const MyMessage &message)
 {
   if (message.getType() == V_STATUS) {
-    if (message.getSensor() > 9) {
+    if (message.getSensor() == 20)
+    {
+      // Reset de l'Arduino
+      pinMode(RESETPIN, OUTPUT);
+      digitalWrite(RESETPIN, LOW);
+    } 
+    else if (message.getSensor() > 9) {
       // ON/OFF
       byte index = message.getSensor() - 10;
 	  if (message.getBool()) {
