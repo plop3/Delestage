@@ -1,7 +1,9 @@
 TODO
 
+- Ajouter le cablage de la pin Reset
+- Tester le reset
+
 Migration MQTT
 --------------
-
 Remplacement du NRF24L01 par un ESP8266/ESP32
 Envoi des données par MQTT
