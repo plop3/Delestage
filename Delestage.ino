@@ -5,12 +5,7 @@
    08/11/2021 Version 2.1.1
 */
 
-// Pins
-//#define RESETPIN 5  // Commande de reset de l'Arduino
-
 //#define MY_DEBUG
-#include <SimpleTimer.h>
-SimpleTimer timer;
 #define TPSSTART 120000  // Délai avant envoi des mesures
 
 // Watchdog
@@ -99,8 +94,6 @@ unsigned long HC, HP = 0;
 String PTEC = "HC..";
 
 void before() {
-  //digitalWrite(RESETPIN, HIGH);
-  //pinMode(RESETPIN, OUTPUT);
   // Coupure de toutes les sorties
   for (int i = 0; i < nbElements; i++) {
     //Serial.println(IO[i].sortie);
@@ -110,6 +103,7 @@ void before() {
   pixels.begin();
   pixels.clear();
   LED(100, 100, 100);  // Blanc
+  delay(10000);
 }
 
 void presentation() {
@@ -128,14 +122,12 @@ void presentation() {
   present(13, S_BINARY, "Salon");
   present(14, S_BINARY, "Cumulus");
   present(15, S_BINARY, "ChambreL2");
-  //present(20, S_BINARY, "ResetDelestage");
 }
 
 void setup() {
   wdt_disable();
   Serial1.begin(1200);
   wdt_enable(WDTO_8S);
-  timer.setTimeout(TPSSTART, startMesure);
   tinfo.init();
   tinfo.attachData(readData);
   tinfo.attachNewFrame(delestage);
@@ -145,7 +137,6 @@ void setup() {
 
 void loop() {
   // Lecture de l'intensité actuelle
-  if (!Mes) timer.run();
   wdt_reset();
   if (Serial1.available())
     tinfo.process(Serial1.read());
@@ -153,12 +144,6 @@ void loop() {
 
 void receive(const MyMessage &message) {
   if (message.getType() == V_STATUS) {
-    /*
-    if (message.getSensor() == 20) {
-      // Reset de l'Arduino
-      pinMode(RESETPIN, OUTPUT);
-      digitalWrite(RESETPIN, LOW);
-    } else */
     if (message.getSensor() > 9) {
       // ON/OFF
       byte index = message.getSensor() - 10;
@@ -190,10 +175,10 @@ void readData(ValueList *me, uint8_t flags) {
       send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
     } else if ((rep == "HCHC") && (valeur > HC)) {
       HC = valeur;
-      if (Mes) send(HC_msg.set(float(valeur) / 1000, 3));
+      send(HC_msg.set(float(valeur) / 1000, 3));
     } else if ((rep == "HCHP") && (valeur > HP)) {
       HP = valeur;
-      if (Mes) send(HP_msg.set(float(valeur) / 1000, 3));
+      send(HP_msg.set(float(valeur) / 1000, 3));
     }
   }
 }
@@ -274,9 +259,4 @@ void updateLed() {
 void LED(byte V, byte R, byte B) {
   pixels.setPixelColor(0, pixels.Color(V, R, B));
   pixels.show();
-}
-
-void startMesure() {
-  // Démarrage des mesures
-  Mes = true;
 }
