@@ -6,7 +6,7 @@
 */
 
 //#define MY_DEBUG
-#define TPSSTART 120000  // Délai avant envoi des mesures
+///#define TPSSTART 120000  // Délai avant envoi des mesures
 
 // Watchdog
 #include <avr/wdt.h>
@@ -42,8 +42,8 @@ MyMessage current_msg(2, V_CURRENT);   // Intensité
 MyMessage current_PTEC(4, V_STATUS);   // Jour / Nuit
 MyMessage delestage_msg(5, V_STATUS);  // Mode délestage
 MyMessage nbdel_msg(6, V_LEVEL);       // Nombre déléments délestés
-MyMessage HC_msg(7, V_KWH);            // en fait c'est des WH
-MyMessage HP_msg(8, V_KWH);            // en fait c'est des WH
+///MyMessage HC_msg(7, V_KWH);            // en fait c'est des WH
+///MyMessage HP_msg(8, V_KWH);            // en fait c'est des WH
 MyMessage Alerte_msg(9, V_STATUS);     // Alerte délestage maximum
 MyMessage ch1_msg(10, V_STATUS);       // Chambre parents
 MyMessage ch2_msg(11, V_STATUS);       // Chambre Félix
@@ -90,7 +90,7 @@ bool Mes = false;  // Autorisation d'envoi des mesures
 // Infos
 byte IINST = 120;
 int PAPP = 30000;
-unsigned long HC, HP = 0;
+///unsigned long HC, HP = 0;
 String PTEC = "HC..";
 
 void before() {
@@ -113,8 +113,8 @@ void presentation() {
   present(4, S_BINARY, "HeurePleine");
   present(5, S_BINARY, "Delestage");
   present(6, S_DUST, "NbElements");
-  present(7, S_POWER, "HeuresCreuses");
-  present(8, S_POWER, "HeuresPleines");
+  ///present(7, S_POWER, "HeuresCreuses");
+  ///present(8, S_POWER, "HeuresPleines");
   present(9, S_BINARY, "Alerte");
   present(10, S_BINARY, "ChambreP");
   present(11, S_BINARY, "ChambreF");
@@ -178,12 +178,12 @@ void readData(ValueList *me, uint8_t flags) {
     } else if (rep == "PTEC") {
       PTEC = me->value;
       send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
-    } else if ((rep == "HCHC") && (valeur > HC)) {
-      HC = valeur;
-      send(HC_msg.set(float(valeur) / 1000, 3));
-    } else if ((rep == "HCHP") && (valeur > HP)) {
-      HP = valeur;
-      send(HP_msg.set(float(valeur) / 1000, 3));
+    ///} else if ((rep == "HCHC") && (valeur > HC)) {
+    ///  HC = valeur;
+    ///  send(HC_msg.set(float(valeur) / 1000, 3));
+    ///} else if ((rep == "HCHP") && (valeur > HP)) {
+    ///  HP = valeur;
+    ///  send(HP_msg.set(float(valeur) / 1000, 3));
     }
   }
 }
