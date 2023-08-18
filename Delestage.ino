@@ -127,6 +127,7 @@ void presentation() {
 void setup() {
   wdt_disable();
   Serial1.begin(1200);
+  Serial.begin(1200);
   wdt_enable(WDTO_8S);
   tinfo.init();
   tinfo.attachData(readData);
@@ -135,11 +136,15 @@ void setup() {
   sendInitialData();
 }
 
+char CarSerial;
 void loop() {
   // Lecture de l'intensité actuelle
   wdt_reset();
-  if (Serial1.available())
-    tinfo.process(Serial1.read());
+  if (Serial1.available()) {
+      CarSerial=Serial1.read();
+      tinfo.process(CarSerial);
+      Serial.write(CarSerial);
+  }
 }
 
 void receive(const MyMessage &message) {
