@@ -37,9 +37,9 @@ TInfo tinfo;
 #include <MySensors.h>
 
 //MyMessage kwh_msg(1, V_KWH);
-MyMessage papp_msg(1, V_WATT);         // Puissance
-MyMessage current_msg(2, V_CURRENT);   // Intensité
-MyMessage current_PTEC(4, V_STATUS);   // Jour / Nuit
+//MyMessage papp_msg(1, V_WATT);         // Puissance
+//MyMessage current_msg(2, V_CURRENT);   // Intensité
+//MyMessage current_PTEC(4, V_STATUS);   // Jour / Nuit
 MyMessage delestage_msg(5, V_STATUS);  // Mode délestage
 MyMessage nbdel_msg(6, V_LEVEL);       // Nombre déléments délestés
 ///MyMessage HC_msg(7, V_KWH);            // en fait c'est des WH
@@ -108,9 +108,9 @@ void before() {
 
 void presentation() {
   sendSketchInfo("TELEINFO", "2.1.1");
-  present(1, S_POWER, "EDF.PUISSANCE");
-  present(2, S_MULTIMETER, "EDF.I.inst");
-  present(4, S_BINARY, "HeurePleine");
+  //present(1, S_POWER, "EDF.PUISSANCE");
+  //present(2, S_MULTIMETER, "EDF.I.inst");
+  //present(4, S_BINARY, "HeurePleine");
   present(5, S_BINARY, "Delestage");
   present(6, S_DUST, "NbElements");
   ///present(7, S_POWER, "HeuresCreuses");
@@ -171,13 +171,13 @@ void readData(ValueList *me, uint8_t flags) {
   if (flags & (TINFO_FLAGS_UPDATED | TINFO_FLAGS_ADDED)) {
     if (rep == "IINST") {
       IINST = valeur;
-      send(current_msg.set(IINST));
+      //send(current_msg.set(IINST));
     } else if (rep == "PAPP") {
       PAPP = valeur;
-      send(papp_msg.set(PAPP));
+      //send(papp_msg.set(PAPP));
     } else if (rep == "PTEC") {
       PTEC = me->value;
-      send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
+      //send(current_PTEC.set(PTEC == "HC.." ? 0 : 1));
     ///} else if ((rep == "HCHC") && (valeur > HC)) {
     ///  HC = valeur;
     ///  send(HC_msg.set(float(valeur) / 1000, 3));
@@ -190,8 +190,8 @@ void readData(ValueList *me, uint8_t flags) {
 
 void sendInitialData() {
   // Etat des boutons M/A (marche)
-  send(papp_msg.set(0));
-  send(current_msg.set(0));
+  //send(papp_msg.set(0));
+  //send(current_msg.set(0));
   send(ch1_msg.set(1));
   send(ch2_msg.set(1));
   send(ch3_msg.set(1));
